@@ -33,8 +33,12 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-userSchema.methods.generateAuthToken = function () {
-  const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+userSchema.methods.accessToken = function () {
+  const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+  return token;
+};
+userSchema.methods.refreshToken = function () {
+  const token = jwt.sign({ _id: this._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
   return token;
 };
 

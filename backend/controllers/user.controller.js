@@ -1,39 +1,43 @@
+import jwt from "jsonwebtoken";
 import { userModel } from "../models/user.model.js";
 import { userServices } from "../services/user.services.js";
-import { setAuthCookie } from "../utils/auth.cookie.js";
+import {
+  setAccessTokenCookie,
+  setRefreshTokenCookie,
+} from "../utils/auth.cookie.js";
 
 export const userRegister = async (req, res) => {
   try {
     const { fullname, email, password } = req.body;
 
-    const hashedPassword = await userModel.hashPassword(password);
+    const userAlreadyExists = await userModel.findOne({ email });
 
-    const user = await userServices.createUser({
-      firstname: fullname.firstname,
-      lastname: fullname.lastname,
-      email,
-      password: hashedPassword,
-    });
+    if (userAlreadyExists) {
+      return res.status(409).json({ message: "User already exists" });
+    } else {
+      const hashedPassword = await userModel.hashPassword(password);
 
-    const token = user.generateAuthToken();
+      const user = await userServices.createUser({
+        firstname: fullname.firstname,
+        lastname: fullname.lastname,
+        email,
+        password: hashedPassword,
+      });
 
-    setAuthCookie(res, token);
+      const token = user.accessToken();
 
-    return res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        _id: user._id,
-        fullname: user.fullname,
-        email: user.email,
-      },
-    });
-  } catch (error) {
-    
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message: "Email already registered",
+      setAccessTokenCookie(res, token);
+
+      return res.status(201).json({
+        message: "User registered successfully",
+        user: {
+          _id: user._id,
+          fullname: user.fullname,
+          email: user.email,
+        },
       });
     }
+  } catch (error) {
     console.error("Error registering user:", error);
 
     return res.status(500).json({
@@ -58,9 +62,11 @@ export const userLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = user.generateAuthToken();
+    const accessToken = user.accessToken();
+    const refreshToken = user.refreshToken();
 
-    setAuthCookie(res, token);
+    setAccessTokenCookie(res, accessToken);
+    setRefreshTokenCookie(res, refreshToken);
 
     return res.status(200).json({
       message: "Login successful",
@@ -79,10 +85,24 @@ export const userLogin = async (req, res) => {
   }
 };
 
+export const logOut = (req, res) => {
+  try {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+
+    return res.status(200).json({
+      message: "Logout successful",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await userModel
-      .findById(req.user._id)
+    const user = req.user;
 
     if (!user) {
       return res.status(404).json({
@@ -102,6 +122,42 @@ export const getUserProfile = async (req, res) => {
 
     return res.status(500).json({
       message: "Internal server error",
+    });
+  }
+};
+
+export const refreshAccessToken = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        message: "Refresh token required",
+      });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    const user = await userModel.findById(decoded._id);
+
+    if (!user) {
+      return res.status(401).json({
+        message: "User not found",
+      });
+    }
+
+    const newAccessToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "15m",
+    });
+
+    setAccessTokenCookie(res, newAccessToken);
+
+    return res.status(200).json({
+      message: "Access token refreshed",
+    });
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired refresh token",
     });
   }
 };

@@ -24,7 +24,7 @@ server.use(
 );
 
 //Routes
-server.use("/api-v1/auth", userRouter)
+server.use("/api/v1/auth", userRouter)
 
 // Database
 const main = async () => {
