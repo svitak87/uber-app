@@ -19,9 +19,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    minlength: [5, "The email must contain 5 characters at least"],
+    minlength: [5, "The email must contain at least 5 characters"],
     lowercase: true,
     trim: true,
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Please enter a valid email address"],
   },
   password: {
     type: String,
@@ -29,16 +30,22 @@ const userSchema = new mongoose.Schema({
     select: false,
   },
   socketId: {
-    type: String
+    type: String,
   },
 });
 
 userSchema.methods.accessToken = function () {
-  const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+  const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET, {
+    expiresIn: "15m",
+  });
   return token;
 };
-userSchema.methods.refreshToken = function () {
-  const token = jwt.sign({ _id: this._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
+userSchema.methods.refreshToken = function ({ jti, familyId } = {}) {
+  const token = jwt.sign(
+    { _id: this._id, jti, familyId },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: "7d" },
+  );
   return token;
 };
 
