@@ -12,13 +12,13 @@ const server = express();
 const PORT = process.env.PORT || 8080;
 
 // Middlewares
-server.use(cors());
+
 server.use(express.json());
 server.use(cookieParser());
 server.use(express.urlencoded({ extended: true }));
 server.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5174", "http://localhost:5173"],
     credentials: true,
   })
 );
